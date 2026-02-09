@@ -1,3 +1,44 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Dark mode styles for react-quill */
+.dark-mode .ql-toolbar {
+	background-color: #1f2937;
+	border-color: #374151;
+}
+
+.dark-mode .ql-toolbar.ql-snow {
+	border-color: #374151;
+}
+
+.dark-mode .ql-toolbar button:hover,
+.dark-mode .ql-toolbar button.ql-active,
+.dark-mode .ql-toolbar button:focus {
+	color: #d1d5db;
+}
+
+.dark-mode .ql-toolbar.ql-snow .ql-picker-label {
+	color: #9ca3af;
+}
+
+.dark-mode .ql-toolbar button svg {
+	fill: #9ca3af;
+}
+
+.dark-mode .ql-container {
+	border-color: #374151;
+}
+
+.dark-mode .ql-editor {
+	background-color: #111827;
+	color: #e5e7eb;
+}
+
+.dark-mode .ql-editor.ql-blank::before {
+	color: #6b7280;
+}
+
+.dark-mode .ql-paste-helper {
+	display: none;
+}
