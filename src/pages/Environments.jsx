@@ -92,67 +92,66 @@ export default function EnvironmentsPage() {
     setSelectedMergeIds(new Set());
   };
 
-  const pageClasses = darkMode ? "bg-slate-950/40 text-slate-100" : "bg-slate-50 text-slate-900";
+  const pageClasses = darkMode ? "text-white" : "text-gray-900";
   const panelClasses = darkMode
-    ? "bg-slate-900/70 border-slate-700/80 shadow-[0_10px_24px_rgba(0,0,0,0.35)] ring-1 ring-slate-700/70"
-    : "bg-white border-slate-200 shadow-sm";
+    ? "rounded-xl p-3 shadow-inner min-h-[200px] transition bg-gray-800"
+    : "rounded-xl p-3 shadow-inner min-h-[200px] transition bg-gray-50";
   const panelHeaderClasses = darkMode
-    ? "bg-slate-900/90 text-slate-100 border-b border-slate-700/70"
-    : "bg-slate-50 text-slate-900 border-b border-slate-200";
+    ? "text-lg font-semibold mb-2 text-center text-gray-300"
+    : "text-lg font-semibold mb-2 text-center text-blue-500";
   const inputClasses = darkMode
-    ? "bg-slate-900/70 border-slate-700 text-slate-100 placeholder:text-slate-400"
-    : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400";
+    ? "bg-gray-800 border-gray-700 text-gray-100 placeholder:text-gray-500"
+    : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400";
   const itemClasses = darkMode
-    ? "bg-slate-900/80 border-slate-700 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-    : "bg-white border-slate-200 text-slate-900";
-  const modalClasses = darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900";
-  const softPanelClasses = darkMode ? "bg-slate-900/60 border-slate-700/70" : "bg-white border-slate-200";
+    ? "p-3 rounded-lg border transition cursor-pointer bg-gray-700 border-gray-600 hover:bg-gray-650 text-gray-200"
+    : "p-3 rounded-lg border transition cursor-pointer bg-white border-gray-200 hover:bg-blue-50 text-gray-900";
+  const modalClasses = darkMode ? "bg-gray-800 text-gray-100" : "bg-white text-gray-900";
+  const softPanelClasses = darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
 
-  const renderPanel = (env) => (
-    <Droppable droppableId={env} key={env}>
-      {(provided) => (
-        <div
-          ref={provided.innerRef}
-          {...provided.droppableProps}
-          className={`rounded-lg border min-h-[170px] overflow-hidden ${panelClasses}`}
-        >
-          <div className={`px-3 py-2 text-sm font-semibold text-center ${panelHeaderClasses}`}>
-            {env}
-          </div>
-          <div className="p-3">
+  const renderPanel = (env) => {
+    const envItems = work.filter((w) => w.environment === env);
+
+    return (
+      <Droppable droppableId={env} key={env}>
+        {(provided) => (
+          <div ref={provided.innerRef} {...provided.droppableProps} className={panelClasses}>
+            <h2 className={panelHeaderClasses}>{env}</h2>
             <div className="flex flex-col gap-2">
-              {work.filter((w) => w.environment === env).map((w, idx) => (
-                <Draggable draggableId={w.id} index={idx} key={w.id}>
-                  {(p) => (
-                    <div
-                      ref={p.innerRef}
-                      {...p.draggableProps}
-                      {...p.dragHandleProps}
-                      className={`p-2 border rounded cursor-pointer flex items-center justify-between ${itemClasses}`}
-                      onClick={() => setSelectedItem(w)}
+              {envItems.length === 0 && (
+                <p className={`text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>No work</p>
+              )}
+              {envItems.map((w, idx) => (
+              <Draggable draggableId={w.id} index={idx} key={w.id}>
+                {(p) => (
+                  <div
+                    ref={p.innerRef}
+                    {...p.draggableProps}
+                    {...p.dragHandleProps}
+                    className={`flex items-center justify-between ${itemClasses}`}
+                    onClick={() => setSelectedItem(w)}
+                  >
+                    <span className="font-medium">{w.name}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteCandidate(w); setShowDeleteConfirm(true); }}
+                      title="Delete"
+                      className={`p-1 rounded ${darkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-600" : "text-red-500 hover:bg-red-50"}`}
                     >
-                      <span>{w.name}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeleteCandidate(w); setShowDeleteConfirm(true); }}
-                        title="Delete"
-                        className="text-red-500 hover:text-red-700 pl-2"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
+                      <Trash2 className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+              </Draggable>
+            ))}
               {provided.placeholder}
             </div>
           </div>
-        </div>
-      )}
-    </Droppable>
-  );
+        )}
+      </Droppable>
+    );
+  };
 
   return (
-    <div className={`w-full rounded-xl p-4 md:p-6 ${pageClasses}`}>
+    <div className={`w-full ${pageClasses}`}>
       <div className="flex items-center gap-2 mb-5">
         <input
           ref={inputRef}
@@ -232,14 +231,14 @@ export default function EnvironmentsPage() {
             <div className="flex gap-2 mb-3">
               <div className="flex-1">
                 <label className="block text-sm">From</label>
-                <select value={mergeFrom} onChange={(e) => { setMergeFrom(e.target.value); setSelectedMergeIds(new Set()); }} className={`w-full border p-2 ${darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-300"}`}>
+                <select value={mergeFrom} onChange={(e) => { setMergeFrom(e.target.value); setSelectedMergeIds(new Set()); }} className={`w-full border p-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-300"}`}>
                   <option value="">Select environment</option>
                   {ENV_ORDER.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
               </div>
               <div className="flex-1">
                 <label className="block text-sm">To</label>
-                <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)} className={`w-full border p-2 ${darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-300"}`}>
+                <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)} className={`w-full border p-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-300"}`}>
                   <option value="">Select environment</option>
                   {ENV_ORDER.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>

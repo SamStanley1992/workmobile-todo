@@ -53,7 +53,10 @@ export default function ToDoApp() {
 
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all"); // status filter in List mode: all, todo, inprogress, completed
-  const [swimlaneMode, setSwimlaneMode] = useState(false);
+  const [swimlaneMode, setSwimlaneMode] = useState(() => {
+    const saved = localStorage.getItem("zenTasksViewMode");
+    return saved === "swimlane";
+  });
   const newTaskInputRef = useRef(null);
   const filterInputRef = useRef(null);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -114,6 +117,11 @@ export default function ToDoApp() {
       filterInputRef.current.focus();
     }
   }, [showTextFilter]);
+
+  // Persist view mode
+  useEffect(() => {
+    localStorage.setItem("zenTasksViewMode", swimlaneMode ? "swimlane" : "list");
+  }, [swimlaneMode]);
 
   // Check if today is Friday
   const isFriday = new Date().getDay() === 5;
@@ -399,7 +407,7 @@ export default function ToDoApp() {
           <FileDown className="h-4 w-4" /> Export
         </Button>
 
-        <Button onClick={() => setShowStandup(true)} className="bg-blue-500 hover:bg-blue-600 text-white cursor-pointer">
+        <Button onClick={() => setShowStandup(true)} className={`cursor-pointer ${darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-white text-blue-600 hover:bg-blue-50"}`}>
           <ClipboardList className="h-4 w-4" /> Daily Update
         </Button>
 
@@ -474,7 +482,7 @@ export default function ToDoApp() {
                                   <div className="p-3 flex items-center gap-3 p-0 flex-wrap">
                                     <div className="flex flex-col gap-1"><span className="font-medium">{task.text}</span></div>
 
-                                    <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
+                                    <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
                                       <option value="todo">To-Do</option>
                                       <option value="inprogress">In-Progress</option>
                                       <option value="done">Completed</option>
@@ -509,7 +517,7 @@ export default function ToDoApp() {
                       <div className="p-3 flex items-center gap-3 p-0 flex-wrap">
                         <div className="flex flex-col gap-1"><span className="font-medium">{task.text}</span></div>
 
-                        <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className="text-xs border border-blue-200 rounded-md px-2 py-1 cursor-pointer bg-white disabled:opacity-50">
+                        <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
                           <option value="todo">To-Do</option>
                           <option value="inprogress">In-Progress</option>
                           <option value="done">Completed</option>

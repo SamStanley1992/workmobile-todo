@@ -42,3 +42,21 @@
 .dark-mode .ql-paste-helper {
 	display: none;
 }
+
+/* Dark mode dropdown styling */
+.dark select {
+	background-color: #111827;
+	color: #e5e7eb;
+	border-color: #374151;
+}
+
+.dark select:focus {
+	outline: none;
+	box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.6);
+	border-color: #60a5fa;
+}
+
+.dark select option {
+	background-color: #0f172a;
+	color: #e5e7eb;
+}
