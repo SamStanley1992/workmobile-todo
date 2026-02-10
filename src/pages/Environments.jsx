@@ -115,6 +115,8 @@ export default function EnvironmentsPage() {
     setCollapsedEnvs((cur) => ({ ...cur, [env]: !cur[env] }));
   };
 
+  const allCollapsed = ENV_ORDER.every((env) => collapsedEnvs[env]);
+
   const renderPanel = (env) => {
     const envItems = work.filter((w) => w.environment === env);
     const isCollapsed = Boolean(collapsedEnvs[env]);
@@ -217,31 +219,37 @@ export default function EnvironmentsPage() {
       )}
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex flex-col gap-6">
+        <div className={`flex flex-col ${allCollapsed ? "gap-3" : "gap-6"}`}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {renderPanel("Dev1")}
             {renderPanel("Dev2")}
             {renderPanel("Dev3")}
           </div>
-          <div className="flex justify-center">
-            <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
-          </div>
+          {!allCollapsed && (
+            <div className="flex justify-center">
+              <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
+            </div>
+          )}
           <div className="flex justify-center">
             <div className="w-full md:w-[70%] lg:w-[60%]">
               {renderPanel("Test")}
             </div>
           </div>
-          <div className="flex justify-center">
-            <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
-          </div>
+          {!allCollapsed && (
+            <div className="flex justify-center">
+              <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
+            </div>
+          )}
           <div className="flex justify-center">
             <div className="w-full md:w-[65%] lg:w-[55%]">
               {renderPanel("Staging")}
             </div>
           </div>
-          <div className="flex justify-center">
-            <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
-          </div>
+          {!allCollapsed && (
+            <div className="flex justify-center">
+              <ChevronDown className={`h-6 w-6 ${darkMode ? "text-slate-500" : "text-slate-400"}`} />
+            </div>
+          )}
           <div className="flex justify-center">
             <div className="w-full md:w-[60%] lg:w-[50%]">
               {renderPanel("Production")}
