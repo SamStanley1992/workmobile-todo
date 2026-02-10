@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useContext } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
-import { PlusCircle, Trash2, Merge, ChevronDown } from "lucide-react";
+import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
 
 const ENV_ORDER = ["Dev1", "Dev2", "Dev3", "Test", "Staging", "Production"];
@@ -27,6 +27,9 @@ export default function EnvironmentsPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [collapsedEnvs, setCollapsedEnvs] = useState(() =>
+    ENV_ORDER.reduce((acc, env) => ({ ...acc, [env]: false }), {})
+  );
 
   useEffect(() => { localStorage.setItem("envWork", JSON.stringify(work)); }, [work]);
 
@@ -94,11 +97,11 @@ export default function EnvironmentsPage() {
 
   const pageClasses = darkMode ? "text-white" : "text-gray-900";
   const panelClasses = darkMode
-    ? "rounded-xl p-3 shadow-inner min-h-[200px] transition bg-gray-800"
-    : "rounded-xl p-3 shadow-inner min-h-[200px] transition bg-gray-50";
+    ? "rounded-xl p-3 shadow-inner transition bg-gray-800"
+    : "rounded-xl p-3 shadow-inner transition bg-gray-50";
   const panelHeaderClasses = darkMode
-    ? "text-lg font-semibold mb-2 text-center text-gray-300"
-    : "text-lg font-semibold mb-2 text-center text-blue-500";
+    ? "text-lg font-semibold mb-2 text-gray-300"
+    : "text-lg font-semibold mb-2 text-blue-500";
   const inputClasses = darkMode
     ? "bg-gray-800 border-gray-700 text-gray-100 placeholder:text-gray-500"
     : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400";
@@ -108,42 +111,66 @@ export default function EnvironmentsPage() {
   const modalClasses = darkMode ? "bg-gray-800 text-gray-100" : "bg-white text-gray-900";
   const softPanelClasses = darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
 
+  const toggleEnvCollapsed = (env) => {
+    setCollapsedEnvs((cur) => ({ ...cur, [env]: !cur[env] }));
+  };
+
   const renderPanel = (env) => {
     const envItems = work.filter((w) => w.environment === env);
+    const isCollapsed = Boolean(collapsedEnvs[env]);
+    const countClasses = darkMode ? "text-sm text-gray-500" : "text-sm text-gray-400";
+    const headerIconClasses = darkMode ? "text-gray-500" : "text-gray-400";
+    const panelStateClasses = isCollapsed ? "min-h-0" : "min-h-[200px]";
 
     return (
-      <Droppable droppableId={env} key={env}>
+      <Droppable droppableId={env} key={env} isDropDisabled={isCollapsed}>
         {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps} className={panelClasses}>
-            <h2 className={panelHeaderClasses}>{env}</h2>
-            <div className="flex flex-col gap-2">
-              {envItems.length === 0 && (
-                <p className={`text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>No work</p>
+          <div ref={provided.innerRef} {...provided.droppableProps} className={`${panelClasses} ${panelStateClasses}`}>
+            <button
+              type="button"
+              onClick={() => toggleEnvCollapsed(env)}
+              className={`w-full flex items-center justify-start gap-2 ${panelHeaderClasses}`}
+              aria-expanded={!isCollapsed}
+              aria-controls={`env-panel-${env}`}
+            >
+              {isCollapsed ? (
+                <ChevronRight className={`h-5 w-5 ${headerIconClasses}`} />
+              ) : (
+                <ChevronDown className={`h-5 w-5 ${headerIconClasses}`} />
               )}
-              {envItems.map((w, idx) => (
-              <Draggable draggableId={w.id} index={idx} key={w.id}>
-                {(p) => (
-                  <div
-                    ref={p.innerRef}
-                    {...p.draggableProps}
-                    {...p.dragHandleProps}
-                    className={`flex items-center justify-between ${itemClasses}`}
-                    onClick={() => setSelectedItem(w)}
-                  >
-                    <span className="font-medium">{w.name}</span>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeleteCandidate(w); setShowDeleteConfirm(true); }}
-                      title="Delete"
-                      className={`p-1 rounded ${darkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-600" : "text-red-500 hover:bg-red-50"}`}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </button>
-                  </div>
+              <span>{env}</span>
+              <span className={countClasses}>({envItems.length})</span>
+            </button>
+            {!isCollapsed && (
+              <div id={`env-panel-${env}`} className="flex flex-col gap-2">
+                {envItems.length === 0 && (
+                  <p className={`text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>No work</p>
                 )}
-              </Draggable>
-            ))}
-              {provided.placeholder}
-            </div>
+                {envItems.map((w, idx) => (
+                  <Draggable draggableId={w.id} index={idx} key={w.id}>
+                    {(p) => (
+                      <div
+                        ref={p.innerRef}
+                        {...p.draggableProps}
+                        {...p.dragHandleProps}
+                        className={`flex items-center justify-between ${itemClasses}`}
+                        onClick={() => setSelectedItem(w)}
+                      >
+                        <span className="font-medium">{w.name}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteCandidate(w); setShowDeleteConfirm(true); }}
+                          title="Delete"
+                          className={`p-1 rounded ${darkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-600" : "text-red-500 hover:bg-red-50"}`}
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
           </div>
         )}
       </Droppable>
