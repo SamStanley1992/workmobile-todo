@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useContext } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
-import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight } from "lucide-react";
+import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight, Filter, Download } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
 
 const ENV_ORDER = ["Dev1", "Dev2", "Dev3", "Test", "Staging", "Production"];
@@ -30,6 +30,9 @@ export default function EnvironmentsPage() {
   const [collapsedEnvs, setCollapsedEnvs] = useState(() =>
     ENV_ORDER.reduce((acc, env) => ({ ...acc, [env]: false }), {})
   );
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterText, setFilterText] = useState("");
+  const [filterEnv, setFilterEnv] = useState("");
 
   useEffect(() => { localStorage.setItem("envWork", JSON.stringify(work)); }, [work]);
 
@@ -117,8 +120,46 @@ export default function EnvironmentsPage() {
 
   const allCollapsed = ENV_ORDER.every((env) => collapsedEnvs[env]);
 
+  const filteredWork = work.filter((w) => {
+    const matchesText = filterText ? w.name.toLowerCase().includes(filterText.toLowerCase()) : true;
+    const matchesEnv = filterEnv ? w.environment === filterEnv : true;
+    return matchesText && matchesEnv;
+  });
+
+  const exportCsv = () => {
+    const sorted = [...work].sort((a, b) => a.environment.localeCompare(b.environment));
+    const escapeCsv = (value) => `"${String(value).replace(/"/g, "\"\"")}"`;
+    const rows = sorted.map((w) => [w.name, w.environment]);
+    const csv = [
+      ["Feature", "Environment"],
+      ...rows,
+    ].map((row) => row.map(escapeCsv).join(",")).join("\n");
+
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const year = String(today.getFullYear());
+    const filename = `Environments_${day}${month}${year}.csv`;
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const clearFilter = () => {
+    setFilterText("");
+    setFilterEnv("");
+  };
+
   const renderPanel = (env) => {
     const envItems = work.filter((w) => w.environment === env);
+    const visibleItems = filteredWork.filter((w) => w.environment === env);
     const isCollapsed = Boolean(collapsedEnvs[env]);
     const countClasses = darkMode ? "text-sm text-gray-500" : "text-sm text-gray-400";
     const headerIconClasses = darkMode ? "text-gray-500" : "text-gray-400";
@@ -145,10 +186,10 @@ export default function EnvironmentsPage() {
             </button>
             {!isCollapsed && (
               <div id={`env-panel-${env}`} className="flex flex-col gap-2">
-                {envItems.length === 0 && (
+                {visibleItems.length === 0 && (
                   <p className={`text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>No work</p>
                 )}
-                {envItems.map((w, idx) => (
+                {visibleItems.map((w, idx) => (
                   <Draggable draggableId={w.id} index={idx} key={w.id}>
                     {(p) => (
                       <div
@@ -204,7 +245,50 @@ export default function EnvironmentsPage() {
           <Merge className="h-4 w-4" />
           Merge
         </button>
+        <button
+          onClick={() => setFilterOpen((v) => !v)}
+          className={`px-3 py-2 rounded flex items-center gap-2 ${darkMode ? "bg-gray-700 text-gray-100" : "bg-gray-100 text-gray-700"}`}
+        >
+          <Filter className="h-4 w-4" />
+          Filter
+        </button>
+        <button
+          onClick={exportCsv}
+          className={`px-3 py-2 rounded flex items-center gap-2 ${darkMode ? "bg-gray-700 text-gray-100" : "bg-gray-100 text-gray-700"}`}
+        >
+          <Download className="h-4 w-4" />
+          Export
+        </button>
       </div>
+
+      {(filterOpen || filterText || filterEnv) && (
+        <div className={`p-4 border rounded mb-4 ${softPanelClasses}`}>
+          <div className="flex flex-wrap gap-3 items-center">
+            <input
+              value={filterText}
+              onChange={(e) => setFilterText(e.target.value)}
+              placeholder="Search features..."
+              className={`flex-1 border rounded px-3 py-2 ${inputClasses}`}
+            />
+            <select
+              value={filterEnv}
+              onChange={(e) => setFilterEnv(e.target.value)}
+              className={`border rounded px-3 py-2 ${inputClasses}`}
+            >
+              <option value="">All environments</option>
+              {ENV_ORDER.map((env) => (
+                <option key={env} value={env}>{env}</option>
+              ))}
+            </select>
+            <button
+              onClick={clearFilter}
+              className={`px-3 py-2 rounded border ${darkMode ? "border-gray-700" : "border-gray-300"}`}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       {chooseEnvFor && (
         <div className={`p-4 border rounded mb-4 ${softPanelClasses}`}>
