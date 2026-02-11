@@ -3,7 +3,8 @@ import { HashRouter, Routes, Route, Link, Outlet, useLocation } from "react-rout
 import ToDoApp from "./App.jsx";
 import EnvironmentsPage from "./pages/Environments.jsx";
 import TeamTasksPage from "./pages/TeamTasks.jsx";
-import { Menu, ClipboardList, Layers, Moon, Sun, Users } from "lucide-react";
+import ReleaseSchedulePage from "./pages/ReleaseSchedule.jsx";
+import { Menu, ClipboardList, Layers, Moon, Sun, Users, CalendarDays } from "lucide-react";
 
 export const DarkModeContext = React.createContext();
 
@@ -19,6 +20,7 @@ function Layout() {
   const pageTitle = React.useMemo(() => {
     if (location.pathname === "/environments") return "Environments";
     if (location.pathname === "/team-tasks") return "Team Tasks";
+    if (location.pathname === "/release-schedule") return "Release Schedule";
     return "Tasks";
   }, [location.pathname]);
 
@@ -58,6 +60,10 @@ function Layout() {
               <Users className="h-4 w-4" />
               <span>Team Tasks</span>
             </Link>
+            <Link to="/release-schedule" onClick={() => setOpen(false)} className={`px-3 py-2 rounded flex items-center gap-3 ${location.pathname === '/release-schedule' ? (isDark ? 'bg-green-800' : 'bg-green-500') : 'hover:bg-green-500/80'}`}>
+              <CalendarDays className="h-4 w-4" />
+              <span>Release Schedule</span>
+            </Link>
           </nav>
         </div>
 
@@ -87,6 +93,7 @@ export default function AppRoutes() {
           <Route index element={<ToDoApp />} />
           <Route path="environments" element={<EnvironmentsPage />} />
           <Route path="team-tasks" element={<TeamTasksPage />} />
+          <Route path="release-schedule" element={<ReleaseSchedulePage />} />
         </Route>
       </Routes>
     </HashRouter>
