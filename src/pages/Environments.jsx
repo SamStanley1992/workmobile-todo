@@ -90,6 +90,9 @@ export default function EnvironmentsPage() {
   const [collapsedEnvs, setCollapsedEnvs] = useState(() =>
     ENV_ORDER.reduce((acc, env) => ({ ...acc, [env]: false }), {})
   );
+  const [showAllEnvs, setShowAllEnvs] = useState(() =>
+    ENV_ORDER.reduce((acc, env) => ({ ...acc, [env]: false }), {})
+  );
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [filterEnv, setFilterEnv] = useState("");
@@ -224,6 +227,10 @@ export default function EnvironmentsPage() {
     setCollapsedEnvs((cur) => ({ ...cur, [env]: !cur[env] }));
   };
 
+  const toggleEnvShowAll = (env) => {
+    setShowAllEnvs((cur) => ({ ...cur, [env]: !cur[env] }));
+  };
+
   const allCollapsed = ENV_ORDER.every((env) => collapsedEnvs[env]);
 
   const filteredWork = work.filter((w) => {
@@ -267,6 +274,8 @@ export default function EnvironmentsPage() {
     const envItems = work.filter((w) => w.environment === env);
     const visibleItems = filteredWork.filter((w) => w.environment === env);
     const isCollapsed = Boolean(collapsedEnvs[env]);
+    const showAll = Boolean(showAllEnvs[env]);
+    const displayItems = showAll ? visibleItems : visibleItems.slice(0, 5);
     const countClasses = darkMode ? "text-sm text-gray-500" : "text-sm text-gray-400";
     const headerIconClasses = darkMode ? "text-gray-500" : "text-gray-400";
     const panelStateClasses = isCollapsed ? "min-h-0" : "min-h-[200px]";
@@ -290,6 +299,18 @@ export default function EnvironmentsPage() {
                 )}
                 <span>{env}</span>
                 <span className={countClasses}>({envItems.length})</span>
+                {envItems.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleEnvShowAll(env);
+                    }}
+                    className={`text-xs underline ${darkMode ? "text-gray-400" : "text-gray-500"}`}
+                  >
+                    {showAll ? "Show less" : "Show all"}
+                  </button>
+                )}
               </button>
               <button
                 type="button"
@@ -301,11 +322,14 @@ export default function EnvironmentsPage() {
               </button>
             </div>
             {!isCollapsed && (
-              <div id={`env-panel-${env}`} className="flex flex-col gap-2">
-                {visibleItems.length === 0 && (
+              <div
+                id={`env-panel-${env}`}
+                className={`flex flex-col gap-2 pr-1 ${showAll ? "" : "max-h-[320px] overflow-y-auto"}`}
+              >
+                {displayItems.length === 0 && (
                   <p className={`text-center text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>No work</p>
                 )}
-                {visibleItems.map((w, idx) => (
+                {displayItems.map((w, idx) => (
                   <Draggable draggableId={w.id} index={idx} key={w.id}>
                     {(p) => (
                       <div
