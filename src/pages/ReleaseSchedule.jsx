@@ -220,7 +220,10 @@ export default function ReleaseSchedulePage() {
   const [activeStreamId, setActiveStreamId] = useState(() => DEFAULT_STREAMS[0].id);
   const [viewMode, setViewMode] = useState("list");
   const [searchText, setSearchText] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
   const [groupByMonth, setGroupByMonth] = useState(true);
+  const moreMenuRef = useRef(null);
   const [collapsedReleaseIds, setCollapsedReleaseIds] = useState(() => ({}));
 
   const [showStreamModal, setShowStreamModal] = useState(false);
@@ -347,6 +350,17 @@ export default function ReleaseSchedulePage() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showReleaseModal, isReleaseDirty]);
+
+  useEffect(() => {
+    if (!showMoreActions) return undefined;
+    const handleOutsideClick = (event) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target)) {
+        setShowMoreActions(false);
+      }
+    };
+    window.addEventListener("mousedown", handleOutsideClick);
+    return () => window.removeEventListener("mousedown", handleOutsideClick);
+  }, [showMoreActions]);
 
   const openStreamModal = (mode, stream) => {
     setStreamModalMode(mode);
@@ -683,14 +697,12 @@ export default function ReleaseSchedulePage() {
     const payload = {
       customer: customerName,
       exportedAt: today.toISOString(),
-      releases: releases
-        .filter((release) => release.streamId === activeStreamId)
-        .map((release) => ({
-          name: release.name,
-          date: release.date,
-          versions: release.versions,
-          contents: release.contents,
-        })),
+      releases: filteredReleases.map((release) => ({
+        name: release.name,
+        date: release.date,
+        versions: release.versions,
+        contents: release.contents,
+      })),
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -704,6 +716,100 @@ export default function ReleaseSchedulePage() {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const loadHtml2Pdf = () =>
+    new Promise((resolve, reject) => {
+      if (window.html2pdf) {
+        resolve(window.html2pdf);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.14.0/dist/html2pdf.bundle.min.js";
+      script.async = true;
+      script.onload = () => resolve(window.html2pdf);
+      script.onerror = () => reject(new Error("Failed to load PDF exporter"));
+      document.body.appendChild(script);
+    });
+
+  const exportCustomerPdf = async () => {
+    const html2pdf = await loadHtml2Pdf();
+    const customer = streams.find((stream) => stream.id === activeStreamId);
+    const customerName = customer?.name || "Customer";
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, "0");
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const year = String(today.getFullYear());
+    const fileName = `${sanitizeFileName(customerName)}_ReleaseSchedule_${day}${month}${year}.pdf`;
+
+    const releasesForCustomer = [...filteredReleases].sort((a, b) =>
+      a.date < b.date ? 1 : -1
+    );
+
+    const container = document.createElement("div");
+    container.style.padding = "24px";
+    container.style.fontFamily = "Arial, sans-serif";
+    container.style.color = "#111827";
+
+    const versionList = (versions) =>
+      versions.length
+        ? `<div style="margin-top: 6px; font-size: 12px; color: #4b5563;">${versions
+            .map((version) => `${version.system} v${version.version}`)
+            .join(" | ")}</div>`
+        : "";
+
+    const contentBlocks = (contents) =>
+      contents
+        .filter((section) => (section.features || []).length > 0 || (section.bugs || []).length > 0)
+        .map((section) => {
+          const features = (section.features || [])
+            .map((text) => `<li style="margin: 4px 0;">${text}</li>`)
+            .join("");
+          const bugs = (section.bugs || [])
+            .map((text) => `<li style="margin: 4px 0;">${text}</li>`)
+            .join("");
+          return `
+            <div style="margin-top: 12px;">
+              <div style="font-weight: 600; margin-bottom: 6px;">${section.system}</div>
+              ${features ? `<div style="font-size: 12px; text-transform: uppercase; color: #6b7280;">Features</div><ul style="margin: 6px 0 10px 18px; padding: 0;">${features}</ul>` : ""}
+              ${bugs ? `<div style="font-size: 12px; text-transform: uppercase; color: #6b7280;">Bugs</div><ul style="margin: 6px 0 0 18px; padding: 0;">${bugs}</ul>` : ""}
+            </div>
+          `;
+        })
+        .join("");
+
+    const releaseBlocks = releasesForCustomer
+      .map((release) => {
+        const dateLabel = formatDateLabel(release.date);
+        return `
+          <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+            <div style="font-size: 16px; font-weight: 700;">${release.name}</div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${dateLabel}</div>
+            ${versionList(release.versions || [])}
+            ${contentBlocks(release.contents || [])}
+          </div>
+        `;
+      })
+      .join("");
+
+    container.innerHTML = `
+      <div style="margin-bottom: 18px;">
+        <div style="font-size: 20px; font-weight: 700;">${customerName} Release Schedule</div>
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Exported ${today.toLocaleString()}</div>
+      </div>
+      ${releaseBlocks || "<div>No releases found.</div>"}
+    `;
+
+    html2pdf()
+      .set({
+        margin: 0.5,
+        filename: fileName,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: "in", format: "a4", orientation: "portrait" },
+      })
+      .from(container)
+      .save();
   };
 
   const handleDragEnd = (result) => {
@@ -763,81 +869,122 @@ export default function ReleaseSchedulePage() {
   return (
     <div className={`w-full ${pageClasses}`}>
       <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            onClick={exportCustomerReleases}
-            className={`px-3 py-2 rounded border flex items-center gap-2 ${toolbarButton}`}
-          >
-            <Download className="h-4 w-4" />
-            Export JSON
-          </button>
-          <button
-            onClick={() => openReleaseModal()}
-            className="px-3 py-2 bg-blue-500 text-white rounded flex items-center gap-2"
-          >
-            <PlusCircle className="h-4 w-4" />
-            New Release
-          </button>
-          <button
-            onClick={() => openStreamModal("add")}
-            className="px-3 py-2 bg-emerald-500 text-white rounded flex items-center gap-2"
-          >
-            <PlusCircle className="h-4 w-4" />
-            Add Customer
-          </button>
-        </div>
-
-        <div className={`p-3 border rounded ${softPanelClasses} flex flex-wrap gap-3 items-center`}>
-          {streams.map((stream) => (
-            <div
-              key={stream.id}
-              className={`flex items-center gap-2 px-3 py-1 rounded-full border ${activeStreamId === stream.id ? "border-transparent" : darkMode ? "border-gray-700" : "border-gray-300"}`}
-              style={{ backgroundColor: activeStreamId === stream.id ? stream.color : "transparent" }}
-            >
-              <button
-                onClick={() => setActiveStreamId(stream.id)}
-                className={`text-sm font-semibold ${activeStreamId === stream.id ? "text-gray-900" : mutedText}`}
-              >
-                {stream.name}
-              </button>
-              <button
-                onClick={() => openStreamModal("rename", stream)}
-                className="text-xs"
-                title="Rename customer"
-              >
-                <Pencil className={`h-3 w-3 ${activeStreamId === stream.id ? "text-gray-900" : mutedText}`} />
-              </button>
-              <button
-                onClick={() => deleteStream(stream.id)}
-                className="text-xs"
-                title={streams.length <= 1 ? "At least one customer required" : "Delete customer"}
-                disabled={streams.length <= 1}
-              >
-                <Trash2 className={`h-3 w-3 ${streams.length <= 1 ? mutedText : activeStreamId === stream.id ? "text-gray-900" : "text-red-500"}`} />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className={`p-4 border rounded ${softPanelClasses} flex flex-wrap gap-3 items-center`}>
-          <div className="flex items-center gap-2">
-            <Search className={`h-4 w-4 ${mutedText}`} />
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search releases"
-              className={`border rounded px-3 py-2 ${darkMode ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
-            />
-          </div>
-          {searchText && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setSearchText("")}
-              className={`px-3 py-2 rounded border ${toolbarButton}`}
+              onClick={() => openReleaseModal()}
+              className="px-3 py-2 bg-blue-500 text-white rounded flex items-center gap-2"
             >
-              Clear Search
+              <PlusCircle className="h-4 w-4" />
+              New Release
             </button>
-          )}
+            <button
+              onClick={() => {
+                setSearchOpen((v) => !v);
+                setShowMoreActions(false);
+              }}
+              className={`px-3 py-2 rounded border flex items-center gap-2 ${toolbarButton}`}
+            >
+              <Search className="h-4 w-4" />
+              Search
+            </button>
+            <div className="relative" ref={moreMenuRef}>
+              <button
+                onClick={() => setShowMoreActions((v) => !v)}
+                className={`px-3 py-2 rounded border flex items-center gap-2 ${toolbarButton}`}
+              >
+                More
+              </button>
+              {showMoreActions && (
+                <div
+                  className={`absolute left-0 mt-2 w-44 border rounded shadow p-2 z-50 ${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"}`}
+                >
+                  <button
+                    onClick={() => {
+                      exportCustomerPdf();
+                      setShowMoreActions(false);
+                    }}
+                    className={`w-full text-left px-2 py-2 rounded hover:opacity-80 flex items-center gap-2 ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-100"}`}
+                  >
+                    <Download className="h-4 w-4" /> Export PDF
+                  </button>
+                  <button
+                    onClick={() => {
+                      exportCustomerReleases();
+                      setShowMoreActions(false);
+                    }}
+                    className={`w-full text-left px-2 py-2 rounded hover:opacity-80 flex items-center gap-2 ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-100"}`}
+                  >
+                    <Download className="h-4 w-4" /> Export JSON
+                  </button>
+                  <button
+                    onClick={() => {
+                      openStreamModal("add");
+                      setShowMoreActions(false);
+                    }}
+                    className={`w-full text-left px-2 py-2 rounded hover:opacity-80 flex items-center gap-2 ${darkMode ? "text-gray-200 hover:bg-gray-700" : "text-gray-900 hover:bg-gray-100"}`}
+                  >
+                    <PlusCircle className="h-4 w-4" /> Add Customer
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={`flex flex-wrap items-center gap-2 rounded border px-3 py-2 ${softPanelClasses}`}>
+            {streams.map((stream) => (
+              <div
+                key={stream.id}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full border ${activeStreamId === stream.id ? "border-transparent" : darkMode ? "border-gray-700" : "border-gray-300"}`}
+                style={{ backgroundColor: activeStreamId === stream.id ? stream.color : "transparent" }}
+              >
+                <button
+                  onClick={() => setActiveStreamId(stream.id)}
+                  className={`text-sm font-semibold ${activeStreamId === stream.id ? "text-gray-900" : mutedText}`}
+                >
+                  {stream.name}
+                </button>
+                <button
+                  onClick={() => openStreamModal("rename", stream)}
+                  className="text-xs"
+                  title="Rename customer"
+                >
+                  <Pencil className={`h-3 w-3 ${activeStreamId === stream.id ? "text-gray-900" : mutedText}`} />
+                </button>
+                <button
+                  onClick={() => deleteStream(stream.id)}
+                  className="text-xs"
+                  title={streams.length <= 1 ? "At least one customer required" : "Delete customer"}
+                  disabled={streams.length <= 1}
+                >
+                  <Trash2 className={`h-3 w-3 ${streams.length <= 1 ? mutedText : activeStreamId === stream.id ? "text-gray-900" : "text-red-500"}`} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {(searchOpen || searchText) && (
+          <div className={`p-4 border rounded ${softPanelClasses} flex flex-wrap gap-3 items-center`}>
+            <div className="flex items-center gap-2">
+              <Search className={`h-4 w-4 ${mutedText}`} />
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search releases"
+                className={`border rounded px-3 py-2 ${darkMode ? "bg-gray-900 border-gray-700 text-gray-100" : "bg-white border-gray-300 text-gray-900"}`}
+              />
+            </div>
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className={`px-3 py-2 rounded border ${toolbarButton}`}
+              >
+                Clear Search
+              </button>
+            )}
+          </div>
+        )}
 
         <div className={`p-3 border rounded ${softPanelClasses} flex flex-wrap items-center gap-3`}>
           <button
@@ -1109,7 +1256,7 @@ export default function ReleaseSchedulePage() {
           onClick={requestCloseReleaseModal}
         >
           <div
-            className={`p-4 rounded-lg w-full max-w-4xl border ${modalClasses}`}
+            className={`p-4 rounded-lg w-full max-w-4xl border max-h-[85vh] overflow-hidden ${modalClasses}`}
             onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -1124,7 +1271,7 @@ export default function ReleaseSchedulePage() {
               </button>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4 overflow-y-auto pr-1 max-h-[75vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-semibold">Release Name</label>

@@ -368,7 +368,7 @@ export default function ToDoApp() {
           }}
           className={`cursor-pointer ${darkMode ? "bg-gray-700 text-gray-300 hover:bg-gray-600" : "bg-white text-blue-600 hover:bg-blue-50"}`}
         >
-          <Search className="h-4 w-4" /> Filter
+          <Search className="h-4 w-4" /> Search
         </Button>
 
         {showTextFilter && (
@@ -433,7 +433,7 @@ export default function ToDoApp() {
 
       {/* Main */}
       <main className="flex-grow p-6 flex flex-col items-center">
-        <div className="w-full max-w-5xl">
+        <div className="w-full max-w-6xl">
           {/* Add Row */}
           <div className="flex gap-2 mb-4 items-center">
             <input
@@ -478,29 +478,30 @@ export default function ToDoApp() {
                           <Draggable key={task.id.toString()} draggableId={task.id.toString()} index={index}>
                             {(prov) => (
                               <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} onClick={() => !isLoading && openTask(task)}>
-                                <div className={`flex justify-between items-center p-3 rounded-xl shadow-sm border transition ${darkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-blue-50"} ${isLoading ? "opacity-70" : "cursor-pointer"} ${task.status === "done" ? darkMode ? "bg-gray-700 line-through text-gray-500" : "bg-blue-50 line-through text-gray-500" : ""}`}>
-                                  <div className="p-3 flex items-center gap-3 p-0 flex-wrap">
-                                    <div className="flex flex-col gap-1"><span className="font-medium">{task.text}</span></div>
-
-                                    <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
-                                      <option value="todo">To-Do</option>
-                                      <option value="inprogress">In-Progress</option>
-                                      <option value="done">Completed</option>
-                                    </select>
+                                <div className={`flex items-center justify-between p-3 rounded-xl shadow-sm border transition ${darkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-blue-50"} ${isLoading ? "opacity-70" : "cursor-pointer"} ${task.status === "done" ? darkMode ? "bg-gray-700 line-through text-gray-500" : "bg-blue-50 line-through text-gray-500" : ""}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-3">
+                                      <span className="font-medium break-words">{task.text}</span>
+                                      <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
+                                        <option value="todo">To-Do</option>
+                                        <option value="inprogress">In-Progress</option>
+                                        <option value="done">Completed</option>
+                                      </select>
+                                    </div>
 
                                     {Array.isArray(task.tags) && task.tags.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">{task.tags.map((tag) => (<span key={tag} className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className="text-blue-500 hover:text-red-500 focus:outline-none" title="Remove tag">×</button></span>))}</div>
+                                      <div className="flex flex-wrap gap-1 mt-2">{task.tags.map((tag) => (<span key={tag} className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className="text-blue-500 hover:text-red-500 focus:outline-none" title="Remove tag">×</button></span>))}</div>
                                     )}
                                   </div>
 
-                                  <div className="flex gap-2 items-center">
-                                    <Button disabled={isLoading} className="text-green-600 cursor-pointer" onClick={(e) => { e.stopPropagation(); moveTask(task.id, task.status === "done" ? "todo" : "done"); }}>
+                                  <div className="task-actions flex items-center justify-end gap-0.5 flex-nowrap min-w-[72px] shrink-0">
+                                    <Button disabled={isLoading} className="text-green-600 cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); moveTask(task.id, task.status === "done" ? "todo" : "done"); }}>
                                       {task.status === "done" ? <XCircle className="h-4 w-4 text-red-500" /> : <Loader2 className="h-4 w-4 text-green-500" />}
                                     </Button>
 
-                                    <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); startTagging(task); }}><Tag className="text-blue-500" /></Button>
+                                    <Button disabled={isLoading} className="p-1" onClick={(e) => { e.stopPropagation(); startTagging(task); }}><Tag className="text-blue-500" /></Button>
 
-                                    <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}><Trash2 className="text-red-500" /></Button>
+                                    <Button disabled={isLoading} className="p-1" onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}><Trash2 className="text-red-500" /></Button>
                                   </div>
                                 </div>
                               </div>
@@ -513,25 +514,26 @@ export default function ToDoApp() {
                   </Droppable>
                 ) : (
                   filteredTasks.map((task) => (
-                    <div key={task.id} onClick={() => !isLoading && openTask(task)} className={`flex justify-between items-center p-3 rounded-xl shadow-sm border transition ${darkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-blue-50"} ${isLoading ? "opacity-70" : "cursor-pointer"} ${task.status === "done" ? darkMode ? "bg-gray-700 line-through text-gray-500" : "bg-blue-50 line-through text-gray-500" : ""}`}>
-                      <div className="p-3 flex items-center gap-3 p-0 flex-wrap">
-                        <div className="flex flex-col gap-1"><span className="font-medium">{task.text}</span></div>
-
-                        <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
-                          <option value="todo">To-Do</option>
-                          <option value="inprogress">In-Progress</option>
-                          <option value="done">Completed</option>
-                        </select>
+                    <div key={task.id} onClick={() => !isLoading && openTask(task)} className={`flex items-center justify-between p-3 rounded-xl shadow-sm border transition ${darkMode ? "bg-gray-800 border-gray-700 hover:bg-gray-750" : "bg-white border-gray-200 hover:bg-blue-50"} ${isLoading ? "opacity-70" : "cursor-pointer"} ${task.status === "done" ? darkMode ? "bg-gray-700 line-through text-gray-500" : "bg-blue-50 line-through text-gray-500" : ""}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="font-medium break-words">{task.text}</span>
+                          <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => { e.stopPropagation(); moveTask(task.id, e.target.value); }} disabled={isLoading} className={`text-xs border rounded-md px-2 py-1 cursor-pointer disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 ${darkMode ? "bg-gray-700 border-gray-600 text-gray-200" : "bg-white border-blue-200 text-gray-900"}`}>
+                            <option value="todo">To-Do</option>
+                            <option value="inprogress">In-Progress</option>
+                            <option value="done">Completed</option>
+                          </select>
+                        </div>
 
                         {Array.isArray(task.tags) && task.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">{task.tags.map((tag) => (<span key={tag} className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className="text-blue-500 hover:text-red-500 focus:outline-none" title="Remove tag">×</button></span>))}</div>
+                          <div className="flex flex-wrap gap-1 mt-2">{task.tags.map((tag) => (<span key={tag} className="flex items-center gap-1 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className="text-blue-500 hover:text-red-500 focus:outline-none" title="Remove tag">×</button></span>))}</div>
                         )}
                       </div>
 
-                      <div className="flex gap-2 items-center">
-                        <Button disabled={isLoading} className="text-green-600 cursor-pointer" onClick={(e) => { e.stopPropagation(); moveTask(task.id, task.status === "done" ? "todo" : "done"); }}>{task.status === "done" ? <XCircle className="h-4 w-4 text-red-500" /> : <Loader2 className="h-4 w-4 text-green-500" />}</Button>
-                        <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); startTagging(task); }}><Tag className="text-blue-500" /></Button>
-                        <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}><Trash2 className="text-red-500" /></Button>
+                                  <div className="task-actions flex items-center justify-end gap-0.5 flex-nowrap min-w-[72px] shrink-0">
+                        <Button disabled={isLoading} className="text-green-600 cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); moveTask(task.id, task.status === "done" ? "todo" : "done"); }}>{task.status === "done" ? <XCircle className="h-4 w-4 text-red-500" /> : <Loader2 className="h-4 w-4 text-green-500" />}</Button>
+                        <Button disabled={isLoading} className="p-1" onClick={(e) => { e.stopPropagation(); startTagging(task); }}><Tag className="text-blue-500" /></Button>
+                        <Button disabled={isLoading} className="p-1" onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}><Trash2 className="text-red-500" /></Button>
                       </div>
                     </div>
                   ))
@@ -541,7 +543,7 @@ export default function ToDoApp() {
 
             {/* Swimlane Mode */}
             {swimlaneMode && (
-              <div className="grid grid-cols-3 gap-4 mt-6">
+              <div className="grid grid-cols-3 gap-3 mt-6">
                 {lanes.map((lane) => (
                   <Droppable key={lane.key} droppableId={lane.key}>
                     {(provided, snapshot) => (
@@ -554,16 +556,16 @@ export default function ToDoApp() {
                           <Draggable key={task.id.toString()} draggableId={task.id.toString()} index={index}>
                             {(prov, snap) => (
                               <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} onClick={() => !isLoading && openTask(task)} className={`p-3 mb-2 rounded-lg border transition cursor-pointer ${darkMode ? "bg-gray-700 border-gray-600 hover:bg-gray-650" : "bg-white border-gray-200 hover:bg-blue-50"} ${snap.isDragging ? darkMode ? "shadow-lg bg-gray-600" : "shadow-lg bg-blue-100" : ""}`}>
-                                <div className="flex justify-between items-start">
-                                  <div className="flex flex-col gap-1">
-                                    <span className={`font-medium ${darkMode ? "text-gray-200" : "text-gray-900"}`}>{task.text}</span>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <span className={`font-medium break-words ${darkMode ? "text-gray-200" : "text-gray-900"}`}>{task.text}</span>
 
                                     {Array.isArray(task.tags) && task.tags.length > 0 && (
-                                      <div className="flex flex-wrap gap-1">{task.tags.map((tag) => (<span key={tag} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${darkMode ? "bg-gray-600 text-gray-300" : "bg-blue-100 text-blue-700"}`}>{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className={`hover:text-red-500 focus:outline-none ${darkMode ? "text-gray-400" : "text-blue-500"}`} title="Remove tag">×</button></span>))}</div>
+                                      <div className="flex flex-wrap gap-1 mt-2">{task.tags.map((tag) => (<span key={tag} className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${darkMode ? "bg-gray-600 text-gray-300" : "bg-blue-100 text-blue-700"}`}>{tag}<button onClick={(e) => { e.stopPropagation(); removeTagFromTask(task.id, tag); }} className={`hover:text-red-500 focus:outline-none ${darkMode ? "text-gray-400" : "text-blue-500"}`} title="Remove tag">×</button></span>))}</div>
                                     )}
                                   </div>
 
-                                  <div className="flex gap-0.5 items-center">
+                                  <div className="task-actions flex items-center justify-end gap-0.5 flex-nowrap min-w-[88px] shrink-0">
                                     {lane.key !== "todo" && <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); moveTask(task.id, lane.key === "inprogress" ? "todo" : "inprogress"); }} className={`cursor-pointer p-1 ${darkMode ? "text-gray-400 hover:text-gray-300 hover:bg-gray-600" : "text-blue-500 hover:text-blue-700 hover:bg-blue-50"}`} title="Move Left"><ArrowLeftCircle className="h-5 w-5" /></Button>}
                                     {lane.key !== "done" && <Button disabled={isLoading} onClick={(e) => { e.stopPropagation(); moveTask(task.id, lane.key === "todo" ? "inprogress" : "done"); }} className={`cursor-pointer p-1 ${darkMode ? "text-gray-400 hover:text-gray-300 hover:bg-gray-600" : "text-green-500 hover:text-green-700 hover:bg-green-50"}`} title="Move Right"><ArrowRightCircle className="h-5 w-5" /></Button>}
 

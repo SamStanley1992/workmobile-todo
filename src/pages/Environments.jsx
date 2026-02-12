@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useContext } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
-import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight, Filter, Download } from "lucide-react";
+import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight, Search, Download } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
 
 const ENV_ORDER = ["Dev1", "Dev2", "Dev3", "Test", "Staging", "Production"];
@@ -249,8 +249,8 @@ export default function EnvironmentsPage() {
           onClick={() => setFilterOpen((v) => !v)}
           className={`px-3 py-2 rounded flex items-center gap-2 ${darkMode ? "bg-gray-700 text-gray-100" : "bg-gray-100 text-gray-700"}`}
         >
-          <Filter className="h-4 w-4" />
-          Filter
+          <Search className="h-4 w-4" />
+          Search
         </button>
         <button
           onClick={exportCsv}

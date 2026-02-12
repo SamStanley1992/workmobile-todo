@@ -23,6 +23,8 @@ const STORAGE_KEYS = {
   subordinates: "teamSubordinates",
 };
 
+const PENDING_TASK_KEY = "teamTasksPendingDraft";
+
 const UNASSIGNED_ID = "unassigned";
 
 const STATUSES = [
@@ -363,6 +365,30 @@ export default function TeamTasksPage() {
     setTagPopoverTaskId(null);
     setTaskModalOpen(true);
   };
+
+  useEffect(() => {
+    const raw = localStorage.getItem(PENDING_TASK_KEY);
+    if (!raw) return;
+    try {
+      const draft = JSON.parse(raw);
+      setSelectedTaskId(null);
+      setTaskDraft({
+        title: draft?.title || "",
+        detail: draft?.detail || "",
+        dueDate: "",
+        tags: [],
+        assignees: [],
+      });
+      setDueDateInput("");
+      setDueDateError("");
+      setTagInput("");
+      setTagPopoverTaskId(null);
+      setTaskModalOpen(true);
+      localStorage.removeItem(PENDING_TASK_KEY);
+    } catch {
+      localStorage.removeItem(PENDING_TASK_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const unassignedCount = assignments.filter((a) => a.personId === UNASSIGNED_ID).length;
@@ -927,9 +953,9 @@ export default function TeamTasksPage() {
                                         className={`border rounded-lg p-3 cursor-pointer transition relative ${cardClasses} ${overdue ? (darkMode ? "border-red-500 bg-red-900/40 text-red-100" : "border-red-500 bg-red-100 text-red-900") : ""}`}
                                         onClick={() => openEditTaskModal(task.id)}
                                       >
-                                        <div className="flex items-start justify-between gap-2">
-                                          <span className="font-medium">{task.title}</span>
-                                          <div className="flex items-center gap-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-medium break-words flex-1 min-w-0">{task.title}</span>
+                                          <div className="task-actions flex items-center justify-end gap-0.5 flex-nowrap min-w-[60px] shrink-0">
                                             {overdue && <Clock className="h-4 w-4 text-red-600" />}
                                             <button
                                               onClick={(e) => {
