@@ -11,6 +11,64 @@ function makeId() {
   return Math.random().toString(36).slice(2, 9);
 }
 
+function replaceEnvItems(list, env, newEnvItems) {
+  let index = 0;
+  const updated = list.map((item) => {
+    if (item.environment !== env) return item;
+    const next = newEnvItems[index];
+    index += 1;
+    return next || item;
+  });
+  if (index < newEnvItems.length) {
+    updated.push(...newEnvItems.slice(index));
+  }
+  return updated;
+}
+
+function reorderEnvItems(list, env, draggedId, destinationId) {
+  const envItems = list.filter((item) => item.environment === env);
+  const fromIndex = envItems.findIndex((item) => item.id === draggedId);
+  if (fromIndex === -1) return list;
+  const [moved] = envItems.splice(fromIndex, 1);
+  if (destinationId) {
+    const toIndex = envItems.findIndex((item) => item.id === destinationId);
+    if (toIndex === -1) {
+      envItems.push(moved);
+    } else {
+      envItems.splice(toIndex, 0, moved);
+    }
+  } else {
+    envItems.push(moved);
+  }
+  return replaceEnvItems(list, env, envItems);
+}
+
+function moveBetweenEnvs(list, sourceEnv, destEnv, draggedId, destinationId) {
+  const sourceItems = list.filter((item) => item.environment === sourceEnv);
+  const destItems = list.filter((item) => item.environment === destEnv);
+  const fromIndex = sourceItems.findIndex((item) => item.id === draggedId);
+  if (fromIndex === -1) return list;
+  const [moved] = sourceItems.splice(fromIndex, 1);
+  const movedItem = {
+    ...moved,
+    environment: destEnv,
+    history: [...(moved.history || []), { env: destEnv, at: Date.now() }],
+  };
+  if (destinationId) {
+    const toIndex = destItems.findIndex((item) => item.id === destinationId);
+    if (toIndex === -1) {
+      destItems.push(movedItem);
+    } else {
+      destItems.splice(toIndex, 0, movedItem);
+    }
+  } else {
+    destItems.push(movedItem);
+  }
+  let updated = replaceEnvItems(list, sourceEnv, sourceItems);
+  updated = replaceEnvItems(updated, destEnv, destItems);
+  return updated;
+}
+
 export default function EnvironmentsPage() {
   const { darkMode } = useContext(DarkModeContext) || {};
   
@@ -27,6 +85,8 @@ export default function EnvironmentsPage() {
   const [selectedItem, setSelectedItem] = useState(null);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingWorkId, setEditingWorkId] = useState(null);
+  const editingInputRefs = useRef({});
   const [collapsedEnvs, setCollapsedEnvs] = useState(() =>
     ENV_ORDER.reduce((acc, env) => ({ ...acc, [env]: false }), {})
   );
@@ -37,6 +97,13 @@ export default function EnvironmentsPage() {
   useEffect(() => { localStorage.setItem("envWork", JSON.stringify(work)); }, [work]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
+
+  useEffect(() => {
+    if (!editingWorkId) return;
+    requestAnimationFrame(() => {
+      editingInputRefs.current[editingWorkId]?.focus();
+    });
+  }, [editingWorkId]);
 
   const addWorkPrompt = (text) => {
     setChooseEnvFor({ id: makeId(), text });
@@ -59,12 +126,51 @@ export default function EnvironmentsPage() {
   const onDragEnd = (result) => {
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
-    // move between environments
-    const item = work.find((w) => w.id === draggableId);
-    if (!item) return;
+    const sourceEnv = source.droppableId;
     const destEnv = destination.droppableId;
-    if (item.environment === destEnv) return;
-    setWork((cur) => cur.map((w) => w.id === draggableId ? { ...w, environment: destEnv, history: [...(w.history||[]), { env: destEnv, at: Date.now() }] } : w));
+    const sourceVisible = filteredWork.filter((w) => w.environment === sourceEnv);
+    const destVisible = filteredWork.filter((w) => w.environment === destEnv);
+    const destinationId = destVisible[destination.index]?.id || null;
+
+    if (sourceEnv === destEnv) {
+      setWork((cur) => reorderEnvItems(cur, sourceEnv, draggableId, destinationId));
+      return;
+    }
+
+    setWork((cur) => moveBetweenEnvs(cur, sourceEnv, destEnv, draggableId, destinationId));
+  };
+
+  const addInlineWork = (env) => {
+    const entry = {
+      id: makeId(),
+      name: "",
+      environment: env,
+      details: "",
+      history: [{ env, at: Date.now() }],
+    };
+    setWork((cur) => {
+      const index = cur.findIndex((item) => item.environment === env);
+      if (index === -1) return [entry, ...cur];
+      const copy = [...cur];
+      copy.splice(index, 0, entry);
+      return copy;
+    });
+    setCollapsedEnvs((cur) => ({ ...cur, [env]: false }));
+    setEditingWorkId(entry.id);
+  };
+
+  const updateWorkName = (id, value) => {
+    setWork((cur) => cur.map((item) => (item.id === id ? { ...item, name: value } : item)));
+  };
+
+  const finalizeWorkName = (id, value) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setWork((cur) => cur.filter((item) => item.id !== id));
+    } else {
+      setWork((cur) => cur.map((item) => (item.id === id ? { ...item, name: trimmed } : item)));
+    }
+    setEditingWorkId(null);
   };
 
   const startMerge = () => {
@@ -169,21 +275,31 @@ export default function EnvironmentsPage() {
       <Droppable droppableId={env} key={env} isDropDisabled={isCollapsed}>
         {(provided) => (
           <div ref={provided.innerRef} {...provided.droppableProps} className={`${panelClasses} ${panelStateClasses}`}>
-            <button
-              type="button"
-              onClick={() => toggleEnvCollapsed(env)}
-              className={`w-full flex items-center justify-start gap-2 ${panelHeaderClasses}`}
-              aria-expanded={!isCollapsed}
-              aria-controls={`env-panel-${env}`}
-            >
-              {isCollapsed ? (
-                <ChevronRight className={`h-5 w-5 ${headerIconClasses}`} />
-              ) : (
-                <ChevronDown className={`h-5 w-5 ${headerIconClasses}`} />
-              )}
-              <span>{env}</span>
-              <span className={countClasses}>({envItems.length})</span>
-            </button>
+            <div className="w-full flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => toggleEnvCollapsed(env)}
+                className={`flex items-center justify-start gap-2 ${panelHeaderClasses}`}
+                aria-expanded={!isCollapsed}
+                aria-controls={`env-panel-${env}`}
+              >
+                {isCollapsed ? (
+                  <ChevronRight className={`h-5 w-5 ${headerIconClasses}`} />
+                ) : (
+                  <ChevronDown className={`h-5 w-5 ${headerIconClasses}`} />
+                )}
+                <span>{env}</span>
+                <span className={countClasses}>({envItems.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => addInlineWork(env)}
+                className={`p-1 rounded ${darkMode ? "text-gray-400 hover:text-gray-200" : "text-blue-500 hover:text-blue-700"}`}
+                title="Add work"
+              >
+                <PlusCircle className="h-4 w-4" />
+              </button>
+            </div>
             {!isCollapsed && (
               <div id={`env-panel-${env}`} className="flex flex-col gap-2">
                 {visibleItems.length === 0 && (
@@ -197,9 +313,32 @@ export default function EnvironmentsPage() {
                         {...p.draggableProps}
                         {...p.dragHandleProps}
                         className={`flex items-center justify-between ${itemClasses}`}
-                        onClick={() => setSelectedItem(w)}
+                        onClick={() => {
+                          if (editingWorkId === w.id) return;
+                          setSelectedItem(w);
+                        }}
                       >
-                        <span className="font-medium">{w.name}</span>
+                        {editingWorkId === w.id ? (
+                          <input
+                            value={w.name}
+                            onChange={(e) => updateWorkName(w.id, e.target.value)}
+                            onBlur={(e) => finalizeWorkName(w.id, e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                finalizeWorkName(w.id, e.currentTarget.value);
+                              }
+                            }}
+                            ref={(node) => {
+                              if (node) editingInputRefs.current[w.id] = node;
+                              else delete editingInputRefs.current[w.id];
+                            }}
+                            className={`flex-1 border rounded px-2 py-1 ${inputClasses}`}
+                            placeholder="Work name"
+                          />
+                        ) : (
+                          <span className="font-medium">{w.name}</span>
+                        )}
                         <button
                           onClick={(e) => { e.stopPropagation(); setDeleteCandidate(w); setShowDeleteConfirm(true); }}
                           title="Delete"
