@@ -23,8 +23,6 @@ const STORAGE_KEYS = {
   subordinates: "teamSubordinates",
 };
 
-const PENDING_TASK_KEY = "teamTasksPendingDraft";
-
 const UNASSIGNED_ID = "unassigned";
 
 const STATUSES = [

@@ -5,8 +5,9 @@ import EnvironmentsPage from "./pages/Environments.jsx";
 import TeamTasksPage from "./pages/TeamTasks.jsx";
 import ReleaseSchedulePage from "./pages/ReleaseSchedule.jsx";
 import BugBuilderPage from "./pages/BugBuilder.jsx";
+import WebClientTesterPage from "./pages/WebClientTester.jsx";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Menu, ClipboardList, Layers, Moon, Sun, Users, CalendarDays, Bug, GripVertical, Settings } from "lucide-react";
+import { Menu, ClipboardList, Layers, Moon, Sun, Users, CalendarDays, Bug, GripVertical, Settings, MonitorCheck } from "lucide-react";
 
 export const DarkModeContext = React.createContext();
 
@@ -18,6 +19,7 @@ const MENU_ITEMS = [
   { id: "team-tasks", to: "/team-tasks", label: "Team Tasks", icon: Users },
   { id: "release-schedule", to: "/release-schedule", label: "Release Schedule", icon: CalendarDays },
   { id: "bug-builder", to: "/bug-builder", label: "Bug Builder", icon: Bug },
+  { id: "web-client-tester", to: "/web-client-tester", label: "Web Client Tester", icon: MonitorCheck },
 ];
 
 const getOrderedMenuItems = () => {
@@ -28,7 +30,6 @@ const getOrderedMenuItems = () => {
     ...item,
     label: labelOverrides[item.id] || item.label,
   }));
-
   if (!storedOrder) return withLabels;
   try {
     const order = JSON.parse(storedOrder);
@@ -211,6 +212,7 @@ export default function AppRoutes() {
           <Route path="team-tasks" element={<TeamTasksPage />} />
           <Route path="release-schedule" element={<ReleaseSchedulePage />} />
           <Route path="bug-builder" element={<BugBuilderPage />} />
+          <Route path="web-client-tester" element={<WebClientTesterPage />} />
         </Route>
       </Routes>
     </HashRouter>
