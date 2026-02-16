@@ -1045,7 +1045,7 @@ export default function ReleaseSchedulePage() {
                   {formatMonthLabel(new Date(`${groupKey}-01`))}
                 </div>
               )}
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {items.map((release) => (
                   <div
                     key={release.id}

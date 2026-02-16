@@ -21,7 +21,10 @@ const STORAGE_KEYS = {
   tasks: "teamTasks",
   assignments: "teamAssignments",
   subordinates: "teamSubordinates",
+  pendingTask: "teamPendingTask",
 };
+
+const PENDING_TASK_KEY = STORAGE_KEYS.pendingTask;
 
 const UNASSIGNED_ID = "unassigned";
 

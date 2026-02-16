@@ -10,11 +10,24 @@ import {
   AlertTriangle,
   Mic,
   MicOff,
+  ExternalLink,
+  Settings,
+  Terminal,
 } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
 const STORAGE_KEY = "bugBuilderDraft";
+const WS_PORT_KEY = "bugBuilderWsPort";
+const DEFAULT_WS_PORT = 3001;
+const ENV_OPTIONS = ["Dev1", "Dev2", "Dev3", "Test", "Staging", "Production"];
+const DEBUG_WS = typeof window !== "undefined"
+  && window.localStorage?.getItem("bugBuilderDebugWs") === "1";
 
 const makeId = () => Math.random().toString(36).slice(2, 10);
+
+const buildUrl = (env) => {
+  const host = env === "Production" ? "www" : env.toLowerCase();
+  return `https://${host}.esayworkmobile.co.uk/auth/sign-in`;
+};
 
 const defaultDraft = {
   title: "",
@@ -270,6 +283,30 @@ const parseTranscript = (raw) => {
   return sections;
 };
 
+const formatIncomingEvent = (payload) => {
+  const label = payload?.label || payload?.text || payload?.name || "";
+  const value = payload?.value || payload?.selected || payload?.input || "";
+  const url = payload?.url || payload?.path || "";
+
+  switch (payload?.type) {
+    case "click":
+      return label ? `Click "${label}"` : null;
+    case "input":
+      return label || value ? `Enter "${value || "[value]"}" into "${label || "[field]"}"` : null;
+    case "select":
+      return label || value ? `Select "${value || "[option]"}" from "${label || "[dropdown]"}"` : null;
+    case "toggle":
+      if (!label) return null;
+      return payload?.checked ? `Enable "${label}"` : `Disable "${label}"`;
+    case "navigation":
+      return url ? `Navigate to "${url}"` : null;
+    case "error":
+      return payload?.message ? `See error "${payload.message}"` : null;
+    default:
+      return payload?.text ? payload.text : null;
+  }
+};
+
 export default function BugBuilderPage() {
   const { darkMode } = useContext(DarkModeContext) || {};
   const [draft, setDraft] = useState(defaultDraft);
@@ -277,21 +314,35 @@ export default function BugBuilderPage() {
   const [toast, setToast] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [environment, setEnvironment] = useState("Test");
+  const [wsPort, setWsPort] = useState(DEFAULT_WS_PORT);
+  const [wsStatus, setWsStatus] = useState("disconnected");
+  const [wsError, setWsError] = useState("");
+  const [showPortSettings, setShowPortSettings] = useState(false);
   const loadedRef = useRef(false);
   const stepInputRefs = useRef({});
   const focusStepIdRef = useRef(null);
   const recognitionRef = useRef(null);
   const transcriptRef = useRef("");
+  const wsRef = useRef(null);
+  const wsReconnectRef = useRef(null);
+  const wsCloseTimerRef = useRef(null);
+  const recentEventRef = useRef(new Map());
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const storedWsPort = localStorage.getItem(WS_PORT_KEY);
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         setDraft(normalizeDraft(parsed));
+        if (parsed.environment) setEnvironment(parsed.environment);
       } catch {
         setDraft(defaultDraft);
       }
+    }
+    if (storedWsPort) {
+      setWsPort(Number(storedWsPort));
     }
     setDirty(false);
     loadedRef.current = true;
@@ -299,9 +350,14 @@ export default function BugBuilderPage() {
 
   useEffect(() => {
     if (!loadedRef.current) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    const payload = { ...draft, environment };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     setDirty(true);
-  }, [draft]);
+  }, [draft, environment]);
+
+  useEffect(() => {
+    localStorage.setItem(WS_PORT_KEY, String(wsPort));
+  }, [wsPort]);
 
   useEffect(() => {
     if (!dirty) return undefined;
@@ -333,7 +389,126 @@ export default function BugBuilderPage() {
     });
   }, [draft.steps]);
 
+  useEffect(() => {
+    if (!wsPort) return undefined;
+    const url = `ws://localhost:${wsPort}`;
+    let active = true;
+
+    if (wsCloseTimerRef.current) {
+      clearTimeout(wsCloseTimerRef.current);
+      wsCloseTimerRef.current = null;
+    }
+
+    const attachHandlers = (ws) => {
+      ws.onopen = () => {
+        setWsStatus("connected");
+        if (DEBUG_WS) console.log("[BB] WS open", url);
+      };
+      ws.onclose = () => {
+        if (DEBUG_WS) console.log("[BB] WS close", url);
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+        if (!active) return;
+        setWsStatus("disconnected");
+        wsReconnectRef.current = setTimeout(connect, 2000);
+      };
+      ws.onerror = () => {
+        setWsError("Recorder connection error");
+        if (DEBUG_WS) console.warn("[BB] WS error", url);
+      };
+      ws.onmessage = (event) => {
+        if (DEBUG_WS) console.log("[BB] WS message", event.data);
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === "screenshot" && payload.dataUrl) {
+            // Attach to latest step
+            setDraft((cur) => {
+              if (cur.steps.length === 0) return cur;
+              const updated = [...cur.steps];
+              const last = updated[updated.steps.length - 1];
+              updated[updated.steps.length - 1] = {
+                ...last,
+                images: [...(last.images || []), { id: makeId(), src: payload.dataUrl }],
+              };
+              return { ...cur, steps: updated };
+            });
+            return;
+          }
+          appendStepFromEvent(payload);
+        } catch {
+          // ignore malformed messages
+        }
+      };
+    };
+
+    const connect = () => {
+      if (!active) return;
+      setWsStatus("connecting");
+
+      const existing = wsRef.current;
+      if (existing && existing.url === url) {
+        if (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING) {
+          attachHandlers(existing);
+          return;
+        }
+      }
+
+      const ws = new WebSocket(url);
+      wsRef.current = ws;
+      attachHandlers(ws);
+    };
+
+    connect();
+
+    return () => {
+      active = false;
+      if (wsReconnectRef.current) {
+        clearTimeout(wsReconnectRef.current);
+      }
+      wsCloseTimerRef.current = setTimeout(() => {
+        if (!wsRef.current) return;
+        if (wsRef.current.url !== url) return;
+        if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+          wsRef.current.close();
+        }
+      }, 250);
+    };
+  }, [wsPort]);
+
   const previewText = useMemo(() => buildBugText(draft), [draft]);
+
+  const environmentUrl = useMemo(() => buildUrl(environment), [environment]);
+
+  const appendStepFromEvent = (payload) => {
+    const keyParts = [payload?.type, payload?.label, payload?.value, payload?.checked, payload?.timestamp];
+    const key = keyParts.filter((part) => part !== undefined && part !== null).join("|");
+    if (key) {
+      const now = Date.now();
+      const last = recentEventRef.current.get(key);
+      if (last && now - last < 750) return;
+      recentEventRef.current.set(key, now);
+      if (recentEventRef.current.size > 50) {
+        const entries = Array.from(recentEventRef.current.entries()).slice(-30);
+        recentEventRef.current = new Map(entries);
+      }
+    }
+    const text = formatIncomingEvent(payload);
+    if (!text) return;
+    const newStep = {
+      id: makeId(),
+      text,
+      images: [],
+    };
+    focusStepIdRef.current = newStep.id;
+    setDraft((cur) => ({ ...cur, steps: [...cur.steps, newStep] }));
+  };
+
+  const copyCommands = async () => {
+    const commands = "npm run dev\nnpm run recorder:server";
+    await navigator.clipboard.writeText(commands);
+    setToast({ type: "success", message: "Commands copied" });
+  };
 
   const setField = (field, value) => {
     setDraft((cur) => ({ ...cur, [field]: value }));
@@ -563,6 +738,73 @@ export default function BugBuilderPage() {
 
   return (
     <div className="w-full">
+      <div className={`border rounded-xl p-4 mb-4 ${panelClasses}`}>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <label className="text-sm font-semibold">Environment</label>
+          <select
+            value={environment}
+            onChange={(event) => setEnvironment(event.target.value)}
+            className={`border rounded px-3 py-2 ${inputClasses}`}
+          >
+            {ENV_OPTIONS.map((env) => (
+              <option key={env} value={env}>
+                {env}
+              </option>
+            ))}
+          </select>
+          {showPortSettings && (
+            <>
+              <label className="text-sm font-semibold">Recorder Port</label>
+              <input
+                type="number"
+                value={wsPort}
+                onChange={(event) => setWsPort(Number(event.target.value) || DEFAULT_WS_PORT)}
+                className={`border rounded px-3 py-2 w-28 ${inputClasses}`}
+              />
+            </>
+          )}
+          <button
+            onClick={() => setShowPortSettings(!showPortSettings)}
+            className={`p-2 rounded border ${darkMode ? "border-gray-700 hover:bg-gray-800" : "border-gray-300 hover:bg-gray-50"}`}
+            title="Port settings"
+          >
+            <Settings className="h-4 w-4" />
+          </button>
+          <div className="flex items-center gap-2 text-sm">
+            <span
+              className={`h-2 w-2 rounded-full ${
+                wsStatus === "connected"
+                  ? "bg-emerald-400"
+                  : wsStatus === "connecting" || wsStatus === "reconnecting"
+                  ? "bg-yellow-400"
+                  : "bg-gray-400"
+              }`}
+            />
+            <span className={mutedText}>
+              {wsStatus === "connected" ? "Connected" : "Disconnected"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={environmentUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={`px-3 py-2 rounded border inline-flex items-center gap-2 ${darkMode ? "border-gray-700" : "border-gray-300"}`}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open Environment
+            </a>
+            <button
+              onClick={copyCommands}
+              className={`px-3 py-2 rounded border inline-flex items-center gap-2 ${darkMode ? "border-gray-700" : "border-gray-300"}`}
+              title="Copy commands to run locally"
+            >
+              <Terminal className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        {wsError && <div className="mt-2 text-sm text-red-400 text-center">{wsError}</div>}
+      </div>
       <div className="flex flex-col lg:flex-row gap-4">
         <div className={`flex-1 border rounded-xl p-4 ${panelClasses}`}>
           <div className="flex flex-col gap-4">

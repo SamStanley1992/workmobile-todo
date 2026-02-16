@@ -2,8 +2,10 @@ const CLICK_DEBOUNCE_MS = 300;
 const MIN_LABEL_LENGTH = 2;
 const DEBUG_COPY_TO_CLIPBOARD = true;
 const DEBUG_BADGE_ID = "__recorder_debug_badge";
+const DEBUG_BADGE_ENABLED = false;
 
 const ensureDebugBadge = () => {
+	if (!DEBUG_BADGE_ENABLED) return;
 	if (document.getElementById(DEBUG_BADGE_ID)) return;
 	const badge = document.createElement("div");
 	badge.id = DEBUG_BADGE_ID;
@@ -23,15 +25,18 @@ const ensureDebugBadge = () => {
 };
 
 const updateDebugBadge = (text) => {
+	if (!DEBUG_BADGE_ENABLED) return;
 	ensureDebugBadge();
 	const badge = document.getElementById(DEBUG_BADGE_ID);
 	if (badge) badge.textContent = text;
 };
 
-if (document.readyState === "loading") {
-	document.addEventListener("DOMContentLoaded", ensureDebugBadge, { once: true });
-} else {
-	ensureDebugBadge();
+if (DEBUG_BADGE_ENABLED) {
+	if (document.readyState === "loading") {
+		document.addEventListener("DOMContentLoaded", ensureDebugBadge, { once: true });
+	} else {
+		ensureDebugBadge();
+	}
 }
 console.log("[Recorder] content script loaded");
 

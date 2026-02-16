@@ -4,7 +4,11 @@
   "version": "0.1.0",
   "description": "Local WorkMobile step recorder for Sam2.0",
   "permissions": ["storage", "tabs", "activeTab", "scripting"],
-  "host_permissions": ["https://*.esayworkmobile.co.uk/*"],
+  "host_permissions": [
+    "https://*.esayworkmobile.co.uk/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -14,7 +18,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.esayworkmobile.co.uk/*"],
+      "matches": [
+        "https://*.esayworkmobile.co.uk/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
       "js": ["content.js"]
     }
   ]
