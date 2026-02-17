@@ -6,25 +6,29 @@ import TeamTasksPage from "./pages/TeamTasks.jsx";
 import ReleaseSchedulePage from "./pages/ReleaseSchedule.jsx";
 import BugBuilderPage from "./pages/BugBuilder.jsx";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Menu, ClipboardList, Layers, Moon, Sun, Users, CalendarDays, Bug, GripVertical, Settings } from "lucide-react";
+import { Menu, ClipboardList, Layers, Moon, Sun, Users, CalendarDays, Bug, GripVertical, Settings, LogOut } from "lucide-react";
+import { useAuth } from "./firebase/AuthContext.jsx";
 
 export const DarkModeContext = React.createContext();
 
 const MENU_STORAGE_KEY = "zenTasksMenuOrder";
 const MENU_LABELS_KEY = "zenTasksMenuLabels";
-const MENU_ITEMS = [
+const ALL_MENU_ITEMS = [
   { id: "tasks", to: "/", label: "Tasks", icon: ClipboardList },
   { id: "environments", to: "/environments", label: "Environments", icon: Layers },
-  { id: "team-tasks", to: "/team-tasks", label: "Team Tasks", icon: Users },
+  { id: "team-tasks", to: "/team-tasks", label: "Team Tasks", icon: Users, adminOnly: true },
   { id: "release-schedule", to: "/release-schedule", label: "Release Schedule", icon: CalendarDays },
   { id: "bug-builder", to: "/bug-builder", label: "Bug Builder", icon: Bug },
 ];
 
-const getOrderedMenuItems = () => {
+const getOrderedMenuItems = (currentUser) => {
+  const isAdmin = currentUser?.email === 'sam.stanley@workmobileforms.com';
+  const availableItems = ALL_MENU_ITEMS.filter(item => !item.adminOnly || isAdmin);
+  
   const storedOrder = localStorage.getItem(MENU_STORAGE_KEY);
   const storedLabels = localStorage.getItem(MENU_LABELS_KEY);
   const labelOverrides = storedLabels ? JSON.parse(storedLabels) : {};
-  const withLabels = MENU_ITEMS.map((item) => ({
+  const withLabels = availableItems.map((item) => ({
     ...item,
     label: labelOverrides[item.id] || item.label,
   }));
@@ -47,7 +51,8 @@ function Layout() {
     const saved = localStorage.getItem("zenTasksDarkMode");
     return saved ? JSON.parse(saved) : false;
   });
-  const [menuItems, setMenuItems] = React.useState(() => getOrderedMenuItems());
+  const { logout, currentUser } = useAuth();
+  const [menuItems, setMenuItems] = React.useState(() => getOrderedMenuItems(currentUser));
   const [reorderMode, setReorderMode] = React.useState(false);
   
   const location = useLocation();
@@ -56,6 +61,11 @@ function Layout() {
     const match = menuItems.find((item) => item.to === location.pathname);
     return match?.label || "Tasks";
   }, [location.pathname, menuItems]);
+
+  // Update menu items when user changes (to show/hide admin-only items)
+  React.useEffect(() => {
+    setMenuItems(getOrderedMenuItems(currentUser));
+  }, [currentUser]);
 
   // Sync darkMode to localStorage and document class
   React.useEffect(() => {
@@ -187,9 +197,14 @@ function Layout() {
           <header className={`${isDark ? 'bg-gray-900 text-white' : 'bg-green-400 text-white'} p-3 flex items-center justify-between shadow-md`}>
             <button onClick={() => setOpen((v) => !v)} className="p-2 rounded border border-white/20 text-white"><Menu /></button>
             <h2 className="text-xl font-semibold">Sam2.0 - {pageTitle}</h2>
-            <button onClick={() => setDarkMode((v) => !v)} className="p-2 rounded border border-white/20 text-white" title="Toggle Dark Mode">
-              {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setDarkMode((v) => !v)} className="p-2 rounded border border-white/20 text-white" title="Toggle Dark Mode">
+                {isDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+              </button>
+              <button onClick={logout} className="p-2 rounded border border-white/20 text-white" title="Sign Out">
+                <LogOut className="h-5 w-5" />
+              </button>
+            </div>
           </header>
           <main className={`flex-1 p-6 ${isDark ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
             <Outlet />

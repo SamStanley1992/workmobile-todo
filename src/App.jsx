@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
+import { useFirestoreDoc } from "./firebase/useFirestore";
+import { useAuth } from "./firebase/AuthContext";
 
 const Card = ({ children, className = "", ...props }) => (
   <div
@@ -42,14 +44,54 @@ const Button = ({ children, className = "", ...props }) => (
 
 export default function ToDoApp() {
   const { darkMode } = useContext(DarkModeContext) || {};
+  const { currentUser } = useAuth();
   
-  const [tasks, setTasks] = useState(() => {
-    const saved = localStorage.getItem("tasks");
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed)
-      ? parsed.map((t) => ({ ...t, tags: Array.isArray(t?.tags) ? t.tags : [], completedAt: t.completedAt || null }))
-      : [];
-  });
+  // Use user-specific Firestore collections
+  const userEmail = currentUser?.email || 'default';
+  const userId = userEmail.replace(/[@.]/g, '_'); // Sanitize email for use in document ID
+  
+  // Use Firestore for tasks (user-specific)
+  const { data: tasksData, updateData: updateTasksData } = useFirestoreDoc("user-tasks", userId, []);
+  const tasks = (tasksData || []).map((t) => ({ 
+    ...t, 
+    tags: Array.isArray(t?.tags) ? t.tags : [], 
+    completedAt: t.completedAt || null 
+  }));
+
+  const setTasks = (newTasksOrUpdater) => {
+    if (typeof newTasksOrUpdater === 'function') {
+      const newTasks = newTasksOrUpdater(tasks);
+      updateTasksData(newTasks);
+    } else {
+      updateTasksData(newTasksOrUpdater);
+    }
+  };
+
+  // Use Firestore for tags (user-specific)
+  const { data: tagsData, updateData: updateTagsData } = useFirestoreDoc("user-tasks-tags", userId, []);
+  const availableTags = Array.isArray(tagsData) ? tagsData : [];
+
+  const setAvailableTags = (newTagsOrUpdater) => {
+    if (typeof newTagsOrUpdater === 'function') {
+      const newTags = newTagsOrUpdater(availableTags);
+      updateTagsData(newTags);
+    } else {
+      updateTagsData(newTagsOrUpdater);
+    }
+  };
+
+  // Use Firestore for deleted tasks (user-specific)
+  const { data: deletedTasksData, updateData: updateDeletedTasksData } = useFirestoreDoc("user-tasks-deleted", userId, []);
+  const deletedTasks = Array.isArray(deletedTasksData) ? deletedTasksData : [];
+
+  const setDeletedTasks = (newDeletedOrUpdater) => {
+    if (typeof newDeletedOrUpdater === 'function') {
+      const newDeleted = newDeletedOrUpdater(deletedTasks);
+      updateDeletedTasksData(newDeleted);
+    } else {
+      updateDeletedTasksData(newDeletedOrUpdater);
+    }
+  };
 
   const [newTask, setNewTask] = useState("");
   const [filter, setFilter] = useState("all"); // status filter in List mode: all, todo, inprogress, completed
@@ -62,11 +104,6 @@ export default function ToDoApp() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [taskDetail, setTaskDetail] = useState("");
   const [tagInput, setTagInput] = useState("");
-  const [availableTags, setAvailableTags] = useState(() => {
-    const saved = localStorage.getItem("tags");
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  });
   const [taggingTask, setTaggingTask] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showStandup, setShowStandup] = useState(false);
@@ -76,11 +113,6 @@ export default function ToDoApp() {
   const [showTextFilter, setShowTextFilter] = useState(false);
   const [textFilter, setTextFilter] = useState("");
   const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [deletedTasks, setDeletedTasks] = useState(() => {
-    const saved = localStorage.getItem("deletedTasks");
-    const parsed = saved ? JSON.parse(saved) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  });
   const [showBin, setShowBin] = useState(false);
   const [selectedDeletedIds, setSelectedDeletedIds] = useState(new Set());
   const [showCleanSlateConfirm, setShowCleanSlateConfirm] = useState(false);
@@ -149,10 +181,6 @@ export default function ToDoApp() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  useEffect(() => localStorage.setItem("tasks", JSON.stringify(tasks)), [tasks]);
-  useEffect(() => localStorage.setItem("tags", JSON.stringify(availableTags)), [availableTags]);
-  useEffect(() => localStorage.setItem("deletedTasks", JSON.stringify(deletedTasks)), [deletedTasks]);
 
   const lanes = useMemo(
     () => [

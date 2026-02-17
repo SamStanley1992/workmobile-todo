@@ -4,6 +4,7 @@ import ReactQuill from "react-quill-new";
 import "react-quill-new/dist/quill.snow.css";
 import { PlusCircle, Trash2, Merge, ChevronDown, ChevronRight, Search, Download } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
+import { useFirestoreCollection } from "../firebase/useFirestore";
 
 const ENV_ORDER = ["Dev1", "Dev2", "Dev3", "Test", "Staging", "Production"];
 
@@ -72,13 +73,22 @@ function moveBetweenEnvs(list, sourceEnv, destEnv, draggedId, destinationId) {
 export default function EnvironmentsPage() {
   const { darkMode } = useContext(DarkModeContext) || {};
   
-  const [work, setWork] = useState(() => {
-    const raw = localStorage.getItem("envWork");
-    try {
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
-  });
+  // Use Firestore for real-time sync
+  const { data: work, loading: workLoading, updateData: updateWork } = useFirestoreCollection("environments", []);
+  
+  // Wrapper to update work with Firestore
+  const setWork = (newWorkOrUpdater) => {
+    if (typeof newWorkOrUpdater === 'function') {
+      // Handle updater function
+      const currentWork = work || [];
+      const newWork = newWorkOrUpdater(currentWork);
+      updateWork(newWork);
+    } else {
+      // Handle direct value
+      updateWork(newWorkOrUpdater);
+    }
+  };
+  
   const [newText, setNewText] = useState("");
   const [chooseEnvFor, setChooseEnvFor] = useState(null);
   const inputRef = useRef(null);
@@ -96,8 +106,6 @@ export default function EnvironmentsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterText, setFilterText] = useState("");
   const [filterEnv, setFilterEnv] = useState("");
-
-  useEffect(() => { localStorage.setItem("envWork", JSON.stringify(work)); }, [work]);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
@@ -233,14 +241,14 @@ export default function EnvironmentsPage() {
 
   const allCollapsed = ENV_ORDER.every((env) => collapsedEnvs[env]);
 
-  const filteredWork = work.filter((w) => {
+  const filteredWork = (work || []).filter((w) => {
     const matchesText = filterText ? w.name.toLowerCase().includes(filterText.toLowerCase()) : true;
     const matchesEnv = filterEnv ? w.environment === filterEnv : true;
     return matchesText && matchesEnv;
   });
 
   const exportCsv = () => {
-    const sorted = [...work].sort((a, b) => a.environment.localeCompare(b.environment));
+    const sorted = [...(work || [])].sort((a, b) => a.environment.localeCompare(b.environment));
     const escapeCsv = (value) => `"${String(value).replace(/"/g, "\"\"")}"`;
     const rows = sorted.map((w) => [w.name, w.environment]);
     const csv = [

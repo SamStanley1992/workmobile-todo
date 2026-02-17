@@ -14,6 +14,7 @@ import {
   Download,
 } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
+import { useFirestoreDoc } from "../firebase/useFirestore";
 
 const STORAGE_KEYS = {
   streams: "releaseStreams",
@@ -205,17 +206,32 @@ const formatVersionLabel = (version) => `${version.system} v${version.version}`;
 export default function ReleaseSchedulePage() {
   const { darkMode } = useContext(DarkModeContext) || {};
 
-  const [streams, setStreams] = useState(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.streams);
-    const parsed = safeParse(raw, DEFAULT_STREAMS);
-    return parsed.length ? parsed : DEFAULT_STREAMS;
-  });
+  // Use Firestore for real-time sync
+  const { data: streamsData, updateData: updateStreamsData } = useFirestoreDoc("release-schedule", "streams", DEFAULT_STREAMS);
+  const { data: releasesData, updateData: updateReleasesData } = useFirestoreDoc("release-schedule", "releases", []);
 
-  const [releases, setReleases] = useState(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.releases);
-    const parsed = safeParse(raw, []);
-    return parsed.map(normalizeRelease);
-  });
+  // Normalize data
+  const streams = (streamsData || []).length ? streamsData : DEFAULT_STREAMS;
+  const releases = (releasesData || []).map(normalizeRelease);
+
+  // Setters that update Firestore
+  const setStreams = (newStreamsOrUpdater) => {
+    if (typeof newStreamsOrUpdater === 'function') {
+      const newStreams = newStreamsOrUpdater(streams);
+      updateStreamsData(newStreams);
+    } else {
+      updateStreamsData(newStreamsOrUpdater);
+    }
+  };
+
+  const setReleases = (newReleasesOrUpdater) => {
+    if (typeof newReleasesOrUpdater === 'function') {
+      const newReleases = newReleasesOrUpdater(releases);
+      updateReleasesData(newReleases);
+    } else {
+      updateReleasesData(newReleasesOrUpdater);
+    }
+  };
 
   const [activeStreamId, setActiveStreamId] = useState(() => DEFAULT_STREAMS[0].id);
   const [viewMode, setViewMode] = useState("list");
@@ -247,14 +263,6 @@ export default function ReleaseSchedulePage() {
   const attachmentInputRef = useRef(null);
 
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.streams, JSON.stringify(streams));
-  }, [streams]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.releases, JSON.stringify(releases));
-  }, [releases]);
 
   useEffect(() => {
     if (!streams.find((s) => s.id === activeStreamId)) {

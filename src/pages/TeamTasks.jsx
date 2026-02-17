@@ -16,6 +16,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
+import { useFirestoreDoc } from "../firebase/useFirestore";
 
 const STORAGE_KEYS = {
   tasks: "teamTasks",
@@ -148,42 +149,73 @@ const ensureUnassignedAssignment = (assignments, taskId) => {
 export default function TeamTasksPage() {
   const { darkMode } = useContext(DarkModeContext) || {};
 
-  const [tasks, setTasks] = useState(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.tasks);
-    const parsed = safeParse(raw, []);
-    return parsed.map((t) => ({
-      ...t,
-      tags: Array.isArray(t?.tags) ? t.tags : [],
-      detail: t.detail || "",
-      dueDate: t.dueDate || "",
-    }));
-  });
+  // Use user-specific Firestore collections
+  const userEmail = 'sam_stanley_workmobileforms_com'; // Only sam.stanley@workmobileforms.com can access
+  
+  // Use Firestore for real-time sync
+  const { data: tasksData, updateData: updateTasksData } = useFirestoreDoc("user-team-tasks", `${userEmail}_tasks`, []);
+  const { data: assignmentsData, updateData: updateAssignmentsData } = useFirestoreDoc("user-team-tasks", `${userEmail}_assignments`, []);
+  const { data: subordinatesData, updateData: updateSubordinatesData } = useFirestoreDoc("user-team-tasks", `${userEmail}_subordinates`, []);
+  const { data: tagsData, updateData: updateTagsData } = useFirestoreDoc("user-team-tasks", `${userEmail}_tags`, []);
 
-  const [assignments, setAssignments] = useState(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.assignments);
-    const parsed = safeParse(raw, []);
-    return parsed.map((a, index) => ({
-      ...a,
-      status: a.status || "todo",
-      orderIndex: Number.isFinite(a.orderIndex) ? a.orderIndex : index,
-      completedDate: a.completedDate || null,
-    }));
-  });
+  // Normalize data
+  const tasks = (tasksData || []).map((t) => ({
+    ...t,
+    tags: Array.isArray(t?.tags) ? t.tags : [],
+    detail: t.detail || "",
+    dueDate: t.dueDate || "",
+  }));
 
-  const [subordinates, setSubordinates] = useState(() => {
-    const raw = localStorage.getItem(STORAGE_KEYS.subordinates);
-    const parsed = safeParse(raw, []);
-    return parsed.map((s) => ({
-      ...s,
-      name: s.name || "",
-    }));
-  });
+  const assignments = (assignmentsData || []).map((a, index) => ({
+    ...a,
+    status: a.status || "todo",
+    orderIndex: Number.isFinite(a.orderIndex) ? a.orderIndex : index,
+    completedDate: a.completedDate || null,
+  }));
 
-  const [availableTags, setAvailableTags] = useState(() => {
-    const raw = localStorage.getItem("tags");
-    const parsed = safeParse(raw, []);
-    return parsed;
-  });
+  const subordinates = (subordinatesData || []).map((s) => ({
+    ...s,
+    name: s.name || "",
+  }));
+
+  const availableTags = tagsData || [];
+
+  // Setters that update Firestore
+  const setTasks = (newTasksOrUpdater) => {
+    if (typeof newTasksOrUpdater === 'function') {
+      const newTasks = newTasksOrUpdater(tasks);
+      updateTasksData(newTasks);
+    } else {
+      updateTasksData(newTasksOrUpdater);
+    }
+  };
+
+  const setAssignments = (newAssignmentsOrUpdater) => {
+    if (typeof newAssignmentsOrUpdater === 'function') {
+      const newAssignments = newAssignmentsOrUpdater(assignments);
+      updateAssignmentsData(newAssignments);
+    } else {
+      updateAssignmentsData(newAssignmentsOrUpdater);
+    }
+  };
+
+  const setSubordinates = (newSubordinatesOrUpdater) => {
+    if (typeof newSubordinatesOrUpdater === 'function') {
+      const newSubordinates = newSubordinatesOrUpdater(subordinates);
+      updateSubordinatesData(newSubordinates);
+    } else {
+      updateSubordinatesData(newSubordinatesOrUpdater);
+    }
+  };
+
+  const setAvailableTags = (newTagsOrUpdater) => {
+    if (typeof newTagsOrUpdater === 'function') {
+      const newTags = newTagsOrUpdater(availableTags);
+      updateTagsData(newTags);
+    } else {
+      updateTagsData(newTagsOrUpdater);
+    }
+  };
 
   const [editingSubordinateId, setEditingSubordinateId] = useState(null);
   const [editingSubordinateName, setEditingSubordinateName] = useState("");
@@ -213,22 +245,6 @@ export default function TeamTasksPage() {
   const titleInputRef = useRef(null);
   const newMemberInputRef = useRef(null);
   const dueDatePickerRef = useRef(null);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(tasks));
-  }, [tasks]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.assignments, JSON.stringify(assignments));
-  }, [assignments]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.subordinates, JSON.stringify(subordinates));
-  }, [subordinates]);
-
-  useEffect(() => {
-    localStorage.setItem("tags", JSON.stringify(availableTags));
-  }, [availableTags]);
 
   useEffect(() => {
     if (taskModalOpen) {

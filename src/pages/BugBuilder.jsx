@@ -15,6 +15,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { DarkModeContext } from "../AppRoutes.jsx";
+import { useFirestoreDoc } from "../firebase/useFirestore";
 const STORAGE_KEY = "bugBuilderDraft";
 const WS_PORT_KEY = "bugBuilderWsPort";
 const DEFAULT_WS_PORT = 3001;
@@ -309,13 +310,42 @@ const formatIncomingEvent = (payload) => {
 
 export default function BugBuilderPage() {
   const { darkMode } = useContext(DarkModeContext) || {};
-  const [draft, setDraft] = useState(defaultDraft);
+  
+  // Use Firestore for the draft (shared across users)
+  const { data: draftData, updateData: updateDraftData, deleteData: deleteDraftData } = useFirestoreDoc("bug-builder", "draft", defaultDraft);
+  const draft = draftData ? normalizeDraft(draftData) : defaultDraft;
+  
+  const setDraft = (newDraftOrUpdater) => {
+    if (typeof newDraftOrUpdater === 'function') {
+      const newDraft = newDraftOrUpdater(draft);
+      updateDraftData(newDraft);
+    } else {
+      updateDraftData(newDraftOrUpdater);
+    }
+  };
+  
   const [dirty, setDirty] = useState(false);
   const [toast, setToast] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
-  const [environment, setEnvironment] = useState("Test");
-  const [wsPort, setWsPort] = useState(DEFAULT_WS_PORT);
+  const [environment, setEnvironment] = useState(() => {
+    // Environment preference from localStorage
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed.environment || "Test";
+      } catch {
+        return "Test";
+      }
+    }
+    return "Test";
+  });
+  const [wsPort, setWsPort] = useState(() => {
+    // WS Port from localStorage (local configuration)
+    const storedWsPort = localStorage.getItem(WS_PORT_KEY);
+    return storedWsPort ? Number(storedWsPort) : DEFAULT_WS_PORT;
+  });
   const [wsStatus, setWsStatus] = useState("disconnected");
   const [wsError, setWsError] = useState("");
   const [showPortSettings, setShowPortSettings] = useState(false);
@@ -329,32 +359,13 @@ export default function BugBuilderPage() {
   const wsCloseTimerRef = useRef(null);
   const recentEventRef = useRef(new Map());
 
+  // Save environment preference to localStorage
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const storedWsPort = localStorage.getItem(WS_PORT_KEY);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        setDraft(normalizeDraft(parsed));
-        if (parsed.environment) setEnvironment(parsed.environment);
-      } catch {
-        setDraft(defaultDraft);
-      }
-    }
-    if (storedWsPort) {
-      setWsPort(Number(storedWsPort));
-    }
-    setDirty(false);
-    loadedRef.current = true;
-  }, []);
-
-  useEffect(() => {
-    if (!loadedRef.current) return;
-    const payload = { ...draft, environment };
+    const payload = { environment };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    setDirty(true);
-  }, [draft, environment]);
+  }, [environment]);
 
+  // Save WS port to localStorage
   useEffect(() => {
     localStorage.setItem(WS_PORT_KEY, String(wsPort));
   }, [wsPort]);
@@ -724,7 +735,6 @@ export default function BugBuilderPage() {
 
   const clearDraft = () => {
     setDraft(defaultDraft);
-    localStorage.removeItem(STORAGE_KEY);
     setDirty(false);
   };
 
